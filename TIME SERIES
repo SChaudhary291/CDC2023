@@ -1,4 +1,3 @@
-#Discovered more packages to use through chatgpt
 ---
 title: "CDC23"
 author: "Sanjana_Chaudhary"
@@ -157,36 +156,34 @@ arima_fit <- auto.arima(fires_monthly$num_fires)
 summary(arima_fit)
 ```
 ```{r}
-# Auto ARIMA model
-arima_fit <- auto.arima(fires_monthly$num_fires)
-
-# Model summary
-summary(arima_fit)
-
+# Auto ARIMA model  
+arima_fit <- auto.arima(fires_monthly$num_fires,  
+                        stepwise = FALSE, approximation = FALSE)
+                        
 # 12-step forecast
 fc <- forecast(arima_fit, 12)
 
-# Forecast accuracy
-accuracy(fc)
-
-# Table of forecasts
 # Forecast months
-# Forecast months
-month_forecast <- seq(max(fires_monthly$month) + 1,  
-                      max(fires_monthly$month) + 12, by = 1)
+month_forecast <- seq(as.Date('2010-01-01'), length.out = 12, by = "month")
 
-# Bind with forecasts       
+# Format months 
+library(lubridate)
+month_forecast <- format(month_forecast, "%b %Y")
+
+# Bind forecasts
 fc_table <- data.frame(Month = month_forecast,
                        Forecast = fc$mean)
-
+                       
 fc_table
 
 # Training and testing accuracy
-train_size <- 0.8
-test_size <- 1 - train_size
+train <- tail(fires_monthly, n = train_size*nrow(fires_monthly))
+arima_train <- auto.arima(train$num_fires, stepwise = FALSE, approximation = FALSE)
+train_acc <- accuracy(forecast(arima_train, h = 12))
 
-train_acc <- accuracy(forecast(arima_fit, tail(fires_monthly$num_fires, n = train_size*nrow(fires_monthly))))
-test_acc <- accuracy(forecast(arima_fit, head(fires_monthly$num_fires, n = test_size*nrow(fires_monthly))))
+test <- head(fires_monthly, n = test_size*nrow(fires_monthly))  
+arima_test <- auto.arima(test$num_fires, stepwise = FALSE, approximation = FALSE)
+test_acc <- accuracy(forecast(arima_test, h = 12))
 ```
 
 
@@ -221,39 +218,7 @@ accuracy(fc)
 ggplot(fires_monthly, aes(x = month, y = num_fires)) +
   geom_line()
 ```
-```{r}
-library(ggplot2)  # Make sure ggplot2 is loaded
-
-# Create a data frame for plotting
-plot_df <- data.frame(
-  Date = fires_monthly$date,
-  Fires = fires_monthly$num_fires, 
-  Forecast = fc$mean
-)
-
-# Create the line plot
-ggplot(plot_df, aes(x = Date)) +
-  geom_line(aes(y = Fires, color = "Actual Fires"), size = 1) +
-  geom_line(aes(y = Forecast, color = "Forecasted Fires"), size = 1, linetype = "dashed") +
-  
-  # Customize colors and linetypes
-  scale_color_manual(values = c("Actual Fires" = "blue", "Forecasted Fires" = "red")) +
-  
-  # Add labels and title
-  labs(
-    x = "Date",
-    y = "Number of Fires",
-    title = "Actual vs. Forecasted Fires Over Time"
-  ) +
-  
-  # Customize the legend
-  theme(legend.title = element_blank()) +
-  guides(color = guide_legend(override.aes = list(linetype = c("solid", "dashed"))))
-
-# Optionally, save the plot as an image file
-ggsave("forecasted_fires_plot.png", plot = last_plot(), width = 8, height = 4)
 
 
-```
 
-
+#Used ChatGpt to find packages and libraries I can use and to also try to debug my code
