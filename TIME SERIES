@@ -1,0 +1,258 @@
+---
+title: "CDC23"
+author: "Sanjana_Chaudhary"
+date: "2023-09-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+
+
+
+```{r cars}
+#install.packages("fable")
+library(readr)
+library(leaps)
+library(corrplot)
+library(mosaic)
+library(Stat2Data)
+library(metRology)
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(scales)
+library(bestglm)
+library(MASS)
+library(tidytext)
+library(dplyr)
+library(ggplot2)
+library(rsyntax)
+library(fable)
+library(fabletools) 
+library(forecast)
+library(zoo) 
+library(tsibble) 
+library(feasts) 
+library(prophet)
+library(lubridate)
+library(imputeTS) 
+library(plotly) 
+
+wildfires <- read_csv("Natural_Sciences.csv")
+wildfires
+```
+
+## Tidy Data
+```{r}
+glimpse(wildfires)
+```
+
+
+
+```{r}
+# Load packages
+library(lubridate)
+library(dplyr)
+
+# Tidy data
+fires_tidy <- wildfires %>%
+  select(FIRE_YEAR, DISCOVERY_DATE, STATE, LATITUDE, LONGITUDE, FIRE_SIZE, STAT_CAUSE_CODE)
+
+fires_tidy$DISCOVERY_DATE <- as.Date(fires_tidy$DISCOVERY_DATE, origin="1899-12-30")
+fires_tidy$FIRE_YEAR <- as.numeric(fires_tidy$FIRE_YEAR) 
+
+# Pivot to date 
+fires_tidy <- fires_tidy %>% 
+  mutate(date = make_date(FIRE_YEAR, yday(DISCOVERY_DATE)))
+
+fires_monthly <- fires_tidy %>%
+  group_by(FIRE_YEAR, month = month(DISCOVERY_DATE)) %>%
+  summarize(num_fires = n())
+
+# Aggregate
+fires_daily <- fires_tidy %>%
+  count(date, name = "num_fires")
+
+# Create date sequence
+all_dates <- seq(as.Date('2000-01-01'), as.Date('2010-12-31'), by = 'day') 
+
+# Convert to dataframe  
+date_df <- data.frame(date = all_dates)
+
+# Join 
+fires_daily <- fires_daily %>%
+right_join(date_df)
+
+```
+
+
+```{r}
+#aggregate data monthly
+
+fires_monthly
+fires_daily
+
+```
+
+```{r}
+#aggregate data by year
+fires_yearly <- fires_tidy %>%
+  group_by(FIRE_YEAR) %>% 
+  summarize(num_fires = n())
+fires_yearly
+```
+
+
+## Explore autocorrelation plots, decompose seasonality, etc to identify patterns
+```{r}
+
+ggplot(fires_daily, aes(x = date, y = num_fires)) +
+  geom_smooth()
+
+```
+
+
+
+
+
+## Fit time series models like ARIMA, ETS, Prophet, etc
+
+
+```{r}
+# Aggregate
+fires_monthly <- fires_tidy %>%
+  group_by(FIRE_YEAR, month = month(DISCOVERY_DATE)) %>%
+  summarize(num_fires = n())
+
+# Auto ARIMA
+arima_fore <- auto.arima(fires_monthly$num_fires)
+
+# Generate forecasts
+fc <- forecast(arima_fore, 12) 
+
+# Extract years as factor
+years <- as.factor(fires_monthly$FIRE_YEAR)
+
+# Plot 
+autoplot(fc) + xlab("Year") + scale_x_discrete(labels = years)
+```
+
+
+## Generate forecasts and evaluate accuracy
+
+```{r}
+arima_fit <- auto.arima(fires_monthly$num_fires)
+summary(arima_fit)
+```
+```{r}
+# Auto ARIMA model
+arima_fit <- auto.arima(fires_monthly$num_fires)
+
+# Model summary
+summary(arima_fit)
+
+# 12-step forecast
+fc <- forecast(arima_fit, 12)
+
+# Forecast accuracy
+accuracy(fc)
+
+# Table of forecasts
+# Forecast months
+# Forecast months
+month_forecast <- seq(max(fires_monthly$month) + 1,  
+                      max(fires_monthly$month) + 12, by = 1)
+
+# Bind with forecasts       
+fc_table <- data.frame(Month = month_forecast,
+                       Forecast = fc$mean)
+
+fc_table
+
+# Training and testing accuracy
+train_size <- 0.8
+test_size <- 1 - train_size
+
+train_acc <- accuracy(forecast(arima_fit, tail(fires_monthly$num_fires, n = train_size*nrow(fires_monthly))))
+test_acc <- accuracy(forecast(arima_fit, head(fires_monthly$num_fires, n = test_size*nrow(fires_monthly))))
+```
+
+
+```{r}
+# Load packages
+library(fable)
+library(forecast)  
+
+# ARIMA model
+arima_fit <- fires_tsibble %>%
+  model(ARIMA(num_fires ~ pdq(1,0,0)))
+  
+# Auto ARIMA
+arima_fore <- auto.arima(fires_monthly$num_fires)
+
+# Forecast
+fc <- forecast(arima_fore, xreg = fires_monthly$FIRE_YEAR)
+
+# Plot
+autoplot(fc) + xlab("Year") 
+
+# Compare AIC
+AIC(arima_fore)
+
+# Evaluate accuracy
+accuracy(fc)
+```
+
+##Make creative, readable, understandable graphs
+
+```{r}
+ggplot(fires_monthly, aes(x = month, y = num_fires)) +
+  geom_line()
+```
+```{r}
+library(ggplot2)  # Make sure ggplot2 is loaded
+
+# Create a data frame for plotting
+plot_df <- data.frame(
+  Date = fires_monthly$date,
+  Fires = fires_monthly$num_fires, 
+  Forecast = fc$mean
+)
+
+# Create the line plot
+ggplot(plot_df, aes(x = Date)) +
+  geom_line(aes(y = Fires, color = "Actual Fires"), size = 1) +
+  geom_line(aes(y = Forecast, color = "Forecasted Fires"), size = 1, linetype = "dashed") +
+  
+  # Customize colors and linetypes
+  scale_color_manual(values = c("Actual Fires" = "blue", "Forecasted Fires" = "red")) +
+  
+  # Add labels and title
+  labs(
+    x = "Date",
+    y = "Number of Fires",
+    title = "Actual vs. Forecasted Fires Over Time"
+  ) +
+  
+  # Customize the legend
+  theme(legend.title = element_blank()) +
+  guides(color = guide_legend(override.aes = list(linetype = c("solid", "dashed"))))
+
+# Optionally, save the plot as an image file
+ggsave("forecasted_fires_plot.png", plot = last_plot(), width = 8, height = 4)
+
+
+```
+
+
